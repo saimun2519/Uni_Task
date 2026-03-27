@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -955,7 +956,7 @@
                 rankHTML += '</div>'; 
             } catch(e) { rankHTML = '<p>Unable to load ranking</p>'; } 
             
-            // FIXED: Updated referral link to your GitHub Pages URL
+            // FIXED: Updated referral link to your GitHub Pages URL (https://saimun2519.github.io/Uni_Task/)
             const baseUrl = 'https://saimun2519.github.io/Uni_Task/';
             const referralLink = `${baseUrl}?ref=${encodeURIComponent(currentUserDoc.username)}`;
             
