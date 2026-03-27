@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -629,7 +630,7 @@
         
         window.submitTaskProof = async () => { 
             if (!currentTask) {
-                showNotification(currentLanguage === 'bn' ? 'কোন টাস্ক নির্বাচন করা হয়নি' : 'No task selected', 'error');
+                showNotification(currentLanguage === 'bn' ? 'কোন টাস্ক নির্বাচন করা হয়নি' : 'No task selected', 'error'); 
                 return; 
             }
             
@@ -655,7 +656,7 @@
                     textProof: text, 
                     reward: currentTask.reward, 
                     status: 'pending', 
-                    credited: false,   // <-- NEW: prevent double crediting
+                    credited: false,
                     submittedAt: new Date().toISOString(),
                     timestamp: serverTimestamp()
                 };
@@ -955,7 +956,9 @@
                 rankHTML += '</div>'; 
             } catch(e) { rankHTML = '<p>Unable to load ranking</p>'; } 
             
-            const referralLink = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(currentUserDoc.username)}`;
+            // FIXED: Updated referral link to your GitHub Pages URL
+            const baseUrl = 'https://saimun2519.github.io/Uni_Task/';
+            const referralLink = `${baseUrl}?ref=${encodeURIComponent(currentUserDoc.username)}`;
             
             let levelsHtml = ''; 
             vipLevels.sort((a,b)=>a.minReferrals-b.minReferrals).forEach(lvl => { 
@@ -1303,7 +1306,7 @@
                         if (document.getElementById('tasksPage').classList.contains('active')) renderTasks(); 
                     });
                     
-                    // Real-time submissions listener with balance update on approval (using transaction)
+                    // Real-time submissions listener with balance update on approval
                     onSnapshot(query(collection(db, "taskSubmissions"), where("userId", "==", currentUserDoc.id)), async (snapshot) => {
                         for (const change of snapshot.docChanges()) {
                             const docId = change.doc.id;
@@ -1311,7 +1314,6 @@
                             
                             if (change.type === 'modified') {
                                 const oldData = userSubmissions.find(s => s.id === docId);
-                                // Only process if status changed to 'approved' and not already credited
                                 if (oldData && oldData.status !== newData.status && newData.status === 'approved' && !newData.credited) {
                                     const reward = Number(newData.reward) || 0;
                                     if (reward > 0) {
@@ -1325,7 +1327,6 @@
                                                 transaction.update(userRef, { balance: newBalance });
                                                 transaction.update(submissionRef, { credited: true });
                                             });
-                                            // Update local balance immediately
                                             currentUserDoc.balance = (currentUserDoc.balance || 0) + reward;
                                             showNotification(
                                                 `✅ ${currentLanguage === 'bn' ? `টাস্ক "${newData.taskTitle}" অনুমোদিত! +৳${formatBDT(reward)} আপনার ব্যালেন্সে যোগ হয়েছে!` : `Task "${newData.taskTitle}" approved! +৳${formatBDT(reward)} added to your balance!`}`,
@@ -1352,7 +1353,6 @@
                                 }
                             }
                         }
-                        // Reload submissions to keep local cache consistent
                         await loadUserSubmissions();
                         if (document.getElementById('tasksPage').classList.contains('active')) renderTasks();
                         if (document.getElementById('profilePage').classList.contains('active')) renderProfile();
