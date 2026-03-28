@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -331,6 +332,14 @@
             font-size: 11px;
             margin-left: 8px;
         }
+        .pending-referral-badge {
+            background: #f39c12;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -420,6 +429,7 @@
                     <p><strong>bKash:</strong> <span id="bkashNumber">01700000000</span></p>
                     <p><strong>Nagad:</strong> <span id="nagadNumber">01700000001</span></p>
                     <p style="color:#d32f2f;">After payment, fill the form. Activation within 24 hours.</p>
+                    <p style="color:#2e7d32; margin-top:10px;"><i class="fas fa-info-circle"></i> Note: Your referral will be credited to your referrer only after you activate your account!</p>
                 </div>
                 <div class="method-selector">
                     <button class="method-btn" onclick="selectActivationMethod(this, 'bkash')">bKash</button>
@@ -735,6 +745,47 @@
             } 
         };
         
+        // Function to process pending referral when user activates account
+        async function processPendingReferral(userId) {
+            try {
+                const userDoc = await getDoc(doc(db, "users", userId));
+                if (!userDoc.exists()) return;
+                const userData = userDoc.data();
+                
+                // Check if there's a pending referral and user is now activated
+                if (userData.pendingReferrer && userData.activated && !userData.referralProcessed) {
+                    const referrerId = userData.pendingReferrer;
+                    const referrerRef = doc(db, "users", referrerId);
+                    const referrerDoc = await getDoc(referrerRef);
+                    
+                    if (referrerDoc.exists()) {
+                        // Credit the referrer with bonus
+                        await updateDoc(referrerRef, {
+                            referrals: increment(1),
+                            referralEarnings: increment(settings.referralBonus),
+                            balance: increment(settings.referralBonus)
+                        });
+                        
+                        // Mark referral as processed
+                        await updateDoc(doc(db, "users", userId), {
+                            referralProcessed: true,
+                            referredBy: referrerId
+                        });
+                        
+                        // Notify the referrer if they are online
+                        showNotification(`🎉 ${currentLanguage === 'bn' ? `আপনার রেফারেল ${userData.username || userData.name} একাউন্ট এক্টিভেট করেছে! +৳${settings.referralBonus} আপনার ব্যালেন্সে যোগ হয়েছে!` : `Your referral ${userData.username || userData.name} activated their account! +৳${settings.referralBonus} added to your balance!`}`, 'success');
+                        
+                        // Also show notification to the new user
+                        if (currentUserDoc && currentUserDoc.id === userId) {
+                            showNotification(`🎉 ${currentLanguage === 'bn' ? `অভিনন্দন! আপনার একাউন্ট এক্টিভেট করার কারণে আপনার রেফারারকে ৳${settings.referralBonus} বোনাস দেওয়া হয়েছে!` : `Congratulations! Your referrer received ৳${settings.referralBonus} bonus for your activation!`}`, 'success');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error processing pending referral:", error);
+            }
+        }
+        
         window.submitActivationRequest = async () => { 
             const trx = document.getElementById('activationTransactionId').value.trim(); 
             const amount = parseFloat(document.getElementById('activationAmount').value);
@@ -955,7 +1006,6 @@
                 rankHTML += '</div>'; 
             } catch(e) { rankHTML = '<p>Unable to load ranking</p>'; } 
             
-            // FIXED: Updated referral link to your GitHub Pages URL (https://saimun2519.github.io/Uni_Task/)
             const baseUrl = 'https://saimun2519.github.io/Uni_Task/';
             const referralLink = `${baseUrl}?ref=${encodeURIComponent(currentUserDoc.username)}`;
             
@@ -964,10 +1014,13 @@
                 levelsHtml += `<div class="vip-level-card"><div class="vip-level-info"><div class="vip-level-name">${lvl.name}</div><div class="vip-level-details">${lvl.minReferrals}+ referrals • ${lvl.commission}% commission</div></div><div class="vip-level-stats"><span>৳${lvl.salary} / month</span></div></div>`; 
             }); 
             
-            page.innerHTML = `<div class="ref-card"><h3>👥 Invite Friends</h3><p>💰 ${settings.referralBonus} BDT per referral</p>
+            page.innerHTML = `<div class="ref-card"><h3>👥 Invite Friends</h3><p>💰 ${settings.referralBonus} BDT per referral <span class="pending-referral-badge"><i class="fas fa-clock"></i> ${currentLanguage === 'bn' ? 'এক্টিভেশনের পরে বোনাস দেওয়া হবে' : 'Bonus after activation'}</span></p>
                 <div class="ref-link-box"><span id="refLink">${referralLink}</span><i class="fas fa-copy copy-icon" onclick="copyText('refLink')"></i></div>
                 <div class="ref-username-box"><span id="refUsername">${currentUserDoc.username}</span><i class="fas fa-copy copy-icon" onclick="copyText('refUsername')"></i></div>
                 <button class="copy-btn" onclick="copyText('refLink')"><i class="fas fa-copy"></i> Copy Link</button>
+                <div style="margin-top:15px; padding:10px; background:#fff3e0; border-radius:20px; font-size:12px;">
+                    <i class="fas fa-info-circle"></i> ${currentLanguage === 'bn' ? 'আপনার রেফার করা ব্যক্তি একাউন্ট এক্টিভেট করার পরই আপনি বোনাস পাবেন!' : 'You will receive bonus only after your referral activates their account!'}
+                </div>
             </div>
             <div class="stats-row"><div class="stat-item"><div class="stat-value">${currentUserDoc.referrals || 0}</div><div class="stat-label">Referrals</div></div><div class="stat-item"><div class="stat-value">৳${formatBDT(currentUserDoc.referralEarnings || 0)}</div><div class="stat-label">Earned</div></div></div>
             <div class="vip-summary"><div><strong>Your Level:</strong> ${vip.name}</div><div><strong>Commission Rate:</strong> ${vip.commission}%</div><div><strong>Monthly Salary:</strong> ৳${vip.salary}</div></div>
@@ -1189,6 +1242,7 @@
                 if (!unameSnap.empty) { document.getElementById('registerError').innerText = currentLanguage === 'bn' ? 'ইউজারনেম নেওয়া হয়েছে' : 'Username taken'; hideLoading(); return; } 
                 const cred = await createUserWithEmailAndPassword(auth, email, pw); 
                 let referrerId = null; 
+                // Store pending referrer - will be processed only after activation
                 if (refUsername) { 
                     const refQuery = query(collection(db, "users"), where("username", "==", refUsername)); 
                     const refSnap = await getDocs(refQuery); 
@@ -1199,7 +1253,9 @@
                     email: email, 
                     name: username, 
                     username: username, 
-                    referredBy: referrerId, 
+                    referredBy: null, // Will be set after activation
+                    pendingReferrer: referrerId, // Store referrer temporarily
+                    referralProcessed: false, // Flag to track if referral bonus has been given
                     balance: 0, 
                     referrals: 0, 
                     referralEarnings: 0, 
@@ -1216,14 +1272,8 @@
                     activated: false 
                 }; 
                 await setDoc(doc(db, "users", cred.user.uid), newUser); 
-                if (referrerId) { 
-                    await updateDoc(doc(db, "users", referrerId), { 
-                        referrals: increment(1), 
-                        referralEarnings: increment(settings.referralBonus),
-                        balance: increment(settings.referralBonus)
-                    }); 
-                } 
-                document.getElementById('registerSuccess').innerText = currentLanguage === 'bn' ? '✅ রেজিস্ট্রেশন সফল! এখন লগইন করুন।' : '✅ Registration successful! You can now login.'; 
+                // DO NOT give referral bonus immediately - wait for activation
+                document.getElementById('registerSuccess').innerText = currentLanguage === 'bn' ? '✅ রেজিস্ট্রেশন সফল! এখন লগইন করুন। আপনার একাউন্ট এক্টিভেট করার পর রেফারার বোনাস পাবেন।' : '✅ Registration successful! You can now login. Your referrer will get bonus after you activate your account.'; 
                 setTimeout(() => showLogin(), 2000); 
             } catch(err) { 
                 hideLoading(); 
@@ -1268,6 +1318,16 @@
                         where("status", "==", "pending")
                     ));
                     activationPending = !actSnap.empty;
+                    
+                    // Check if user just got activated and has pending referral
+                    if (currentUserDoc.activated && currentUserDoc.pendingReferrer && !currentUserDoc.referralProcessed) {
+                        await processPendingReferral(currentUserDoc.id);
+                        // Refresh user data after processing
+                        const refreshedSnap = await getDoc(doc(db, "users", currentUserDoc.id));
+                        if (refreshedSnap.exists()) {
+                            currentUserDoc = { id: refreshedSnap.id, ...refreshedSnap.data() };
+                        }
+                    }
                     
                     document.getElementById('authPages').style.display = 'none';
                     document.getElementById('mainApp').style.display = 'block';
@@ -1357,7 +1417,7 @@
                         if (document.getElementById('profilePage').classList.contains('active')) renderProfile();
                     });
                     
-                    // Check for activation approval
+                    // Check for activation approval - when approved, process pending referral
                     onSnapshot(query(
                         collection(db, "activationRequests"), 
                         where("userId", "==", currentUserDoc.id), 
@@ -1366,6 +1426,12 @@
                         if (!snap.empty && currentUserDoc && !currentUserDoc.activated) { 
                             await updateDoc(doc(db, "users", currentUserDoc.id), { activated: true }); 
                             showNotification("🎉 " + (currentLanguage === 'bn' ? 'অভিনন্দন! আপনার একাউন্ট এক্টিভেট হয়েছে! এখন আপনি আয় করতে পারবেন।' : 'Congratulations! Your account has been activated! Now you can start earning.'), "success"); 
+                            
+                            // Process pending referral after activation
+                            if (currentUserDoc.pendingReferrer && !currentUserDoc.referralProcessed) {
+                                await processPendingReferral(currentUserDoc.id);
+                            }
+                            
                             renderHome(); 
                             renderTasks(); 
                             renderProfile();
